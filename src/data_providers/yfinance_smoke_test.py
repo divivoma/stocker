@@ -1,25 +1,29 @@
 import yfinance as yf
 
-ticker = yf.Ticker("AAPL")
+tickers = {
+    "Infineon": "IFX.DE",
+    "NXP": "NXPI",
+    "STMicro": "STM",
+    "Texas Instruments": "TXN",
+    "NVIDIA": "NVDA",
+    "Ferrari": "RACE",
+}
 
-info = ticker.info
-financials = ticker.financials
-quarterly_financials = ticker.quarterly_financials
+for name, symbol in tickers.items():
+    print(f"\n=== {name} ({symbol}) ===")
+    t = yf.Ticker(symbol)
 
-print("PRICE:", info.get("currentPrice"))
-print("MARKET CAP:", info.get("marketCap"))
-print("PE TTM:", info.get("trailingPE"))
-print("PE FORWARD:", info.get("forwardPE"))
-print("GROSS MARGIN:", info.get("grossMargins"))
+    info = t.info
+    qf = t.quarterly_financials
 
-print("\nLATEST QUARTER NET INCOME:")
-if "Net Income" in quarterly_financials.index:
-    print(quarterly_financials.loc["Net Income"].iloc[0])
-else:
-    print("Net Income not available")
+    print("Price:", info.get("currentPrice"))
+    print("Market Cap:", info.get("marketCap"))
+    print("PE TTM:", info.get("trailingPE"))
+    print("PE Forward:", info.get("forwardPE"))
+    print("Gross Margin:", info.get("grossMargins"))
 
-print("\nLAST 4 QUARTERS NET INCOME:")
-if "Net Income" in quarterly_financials.index:
-    print(quarterly_financials.loc["Net Income"].head(4))
-else:
-    print("Net Income not available")
+    if "Net Income" in qf.index:
+        print("Latest Quarter Net Income:", qf.loc["Net Income"].iloc[0])
+    else:
+        print("Net Income: NOT AVAILABLE")
+
