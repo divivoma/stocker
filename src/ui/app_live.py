@@ -17,12 +17,28 @@ st.title("Stock Tracker - Live Metrics")
 
 # Multiple tickers
 available_tickers = [
+    # Big Tech
     "AAPL",
+    "GOOGL",  # Alphabet Inc
+    "META",   # Meta Platforms
+    "TSLA",   # Tesla
+    # Semiconductors
     "NVDA",
+    "TSM",    # TSMC
+    "QCOM",   # Qualcomm
+    "MU",     # Micron
+    "SNPS",   # Synopsys
     "TXN",
     "STM",
     "NXPI",
+    "005930.KS",  # Samsung Electronics (Korea)
+    # Quantum Computing
+    "RGTI",   # Rigetti Computing
+    # Asian Markets
+    "1810.HK",  # Xiaomi
+    # European
     "IFX.DE",
+    # Other
     "RACE",
 ]
 
