@@ -1,5 +1,6 @@
 import streamlit as st
 from src.data_providers.yfinance_provider import YFinanceProvider
+from src.domain.earnings_momentum import classify_earnings_momentum
 import pandas as pd
 
 # --- Provider setup ---
@@ -32,6 +33,9 @@ if not selected_tickers:
     st.info("Select at least one ticker.")
     st.stop()
 
+
+
+
 for ticker in selected_tickers:
     metrics = provider.get_core_metrics(ticker)
 
@@ -62,6 +66,9 @@ for ticker in selected_tickers:
         st.write("Data not available")
 
 
+# ------------------------
+# Matrix 1 — Core Metrics
+# ------------------------
 #adding a matrix view to get side by side comparison of key metrics 
 #across different tickers but not historical earning per quarter
 
@@ -71,6 +78,9 @@ core_rows = []
 
 for ticker in selected_tickers:
     m = provider.get_core_metrics(ticker)
+    earnings_momentum = classify_earnings_momentum(
+        m.net_income_last_4_quarters
+    )
 
     core_rows.append({
         "Ticker": ticker,
@@ -80,12 +90,8 @@ for ticker in selected_tickers:
         "P/E (Forward)": m.pe_forward,
         "Gross Margin": m.gross_margin,
         "Net Income (Last Q)": m.net_income_last_quarter,
-        "Net Income (Last 4Q Total)": (
-            sum(m.net_income_last_4_quarters)
-            if m.net_income_last_4_quarters
-            else None
-        ),
-    })
+        "Earnings Momentum": earnings_momentum,
+        })
 
 core_df = (
     pd.DataFrame(core_rows)
@@ -97,6 +103,12 @@ st.dataframe(
     use_container_width=True,
 )
 
+
+
+# --------------------------------
+# Matrix 2 — Net Income by Quarter
+# --------------------------------
+
 st.divider()
 st.subheader("Net Income — Last 4 Quarters")
 
@@ -105,7 +117,6 @@ quarter_labels = ["Q-1 (Most Recent)", "Q-2", "Q-3", "Q-4"]
 
 for ticker in selected_tickers:
     m = provider.get_core_metrics(ticker)
-
     row = {"Ticker": ticker}
 
     if m.net_income_last_4_quarters:
