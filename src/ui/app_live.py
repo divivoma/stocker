@@ -142,7 +142,11 @@ for ticker in selected_tickers:
 
     if m.net_income_last_4_quarters:
         for i, q in enumerate(quarter_labels):
-            row[q] = m.net_income_last_4_quarters[i]
+            # Handle case where fewer than 4 quarters available
+            if i < len(m.net_income_last_4_quarters):
+                row[q] = m.net_income_last_4_quarters[i]
+            else:
+                row[q] = None
     else:
         for q in quarter_labels:
             row[q] = None
