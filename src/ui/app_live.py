@@ -1,11 +1,19 @@
 import streamlit as st
-from src.data_providers.yfinance_provider import YFinanceProvider
+import pandas as pd
+import sys
+from pathlib import Path
+
+# Add project root to path for imports
+project_root = Path(__file__).parent.parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+from src.data_providers.cached_provider import CachedDataProvider
 from src.domain.earnings_momentum import classify_earnings_momentum
 from src.domain.position import Position, format_trigger_status
-import pandas as pd
 
-# --- Provider setup ---
-provider = YFinanceProvider()
+# --- Provider setup (with SQLite caching) ---
+provider = CachedDataProvider()
 
 # --- Session state for positions ---
 if "positions" not in st.session_state:
@@ -13,6 +21,14 @@ if "positions" not in st.session_state:
 
 # --- UI ---
 st.title("Stock Tracker - Live Metrics")
+
+# --- Sidebar with cache stats ---
+with st.sidebar:
+    st.header("Cache Status")
+    cache_stats = provider.get_cache_stats()
+    st.metric("Cached Prices", cache_stats["prices_count"])
+    st.metric("Cache Hit Rate", cache_stats["hit_rate"])
+    st.caption(f"DB Size: {cache_stats['db_size_kb']:.1f} KB")
 
 
 # Multiple tickers
