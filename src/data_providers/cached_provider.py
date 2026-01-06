@@ -4,7 +4,7 @@ Implements tiered caching strategy for optimal performance.
 """
 
 from typing import Optional
-from src.data_providers.yfinance_provider import YFinanceProvider
+from src.data_providers.yfinance_provider import YFinanceProvider, PriceHistory
 from src.data_providers.cache import StockCache
 from src.domain.core_metrics import CoreMetrics
 
@@ -105,3 +105,7 @@ class CachedDataProvider:
             )
         
         return fresh_metrics
+    
+    def get_price_history(self, ticker_symbol: str, days: int = 10) -> Optional[PriceHistory]:
+        """Get price history - always fetches fresh (not cached, changes daily)."""
+        return self.yfinance.get_price_history(ticker_symbol, days)
