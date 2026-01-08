@@ -9,13 +9,14 @@ Following PRD Chapter 7 UI Requirements:
 
 import streamlit as st
 import pandas as pd
-import sys
-from pathlib import Path
+#import sys
+#from pathlib import Path
+
 
 # Add project root to path for imports
-project_root = Path(__file__).parent.parent.parent
-if str(project_root) not in sys.path:
-    sys.path.insert(0, str(project_root))
+#project_root = Path(__file__).parent.parent.parent
+#if str(project_root) not in sys.path:
+#    sys.path.insert(0, str(project_root))
 
 from src.data_providers.cached_provider import CachedDataProvider
 from src.domain.earnings_momentum import classify_earnings_momentum
@@ -96,6 +97,22 @@ if "positions" not in st.session_state:
 
 # --- Header ---
 st.title("Stock Tracker")
+
+# --- Rate Limit Warning Banner ---
+cache_stats = provider.get_cache_stats()
+if cache_stats.get("rate_limited", False):
+    last_update = cache_stats.get("last_update")
+    if last_update:
+        update_str = last_update.strftime("%Y-%m-%d %H:%M")
+        st.warning(
+            f"⚠️ **Live data temporarily unavailable** (Yahoo Finance rate limit). "
+            f"Showing cached data from: **{update_str}**"
+        )
+    else:
+        st.warning(
+            "⚠️ **Live data temporarily unavailable** (Yahoo Finance rate limit). "
+            "Showing cached data."
+        )
 
 # --- Ticker Selection (Top Bar) ---
 available_tickers = [
@@ -415,13 +432,25 @@ with tab_positions:
 # --- Sidebar with cache stats ---
 with st.sidebar:
     st.markdown("### System Status")
-    cache_stats = provider.get_cache_stats()
-    st.metric("Cached Tickers", cache_stats["prices_count"])
-    st.metric("Cache Hit Rate", cache_stats["hit_rate"])
-    st.caption(f"DB: {cache_stats['db_size_kb']:.1f} KB")
+    sidebar_stats = provider.get_cache_stats()
+    st.metric("Cached Tickers", sidebar_stats["prices_count"])
+    st.metric("Cache Hit Rate", sidebar_stats["hit_rate"])
+    
+    # Show last update time
+    last_update = sidebar_stats.get("last_update")
+    if last_update:
+        st.caption(f"Last update: {last_update.strftime('%m/%d %H:%M')}")
+    
+    # Show rate limit status
+    if sidebar_stats.get("rate_limited"):
+        st.error("⚠️ Rate Limited")
+    else:
+        st.success("✅ Live Data")
+    
+    st.caption(f"DB: {sidebar_stats['db_size_kb']:.1f} KB")
     
     st.markdown("---")
     st.markdown("### About")
-    st.caption("Stock Tracker v0.2.0")
+    st.caption("Stock Tracker v0.3.0")
     st.caption("Descriptive financial data only.")
     st.caption("No buy/sell recommendations.")

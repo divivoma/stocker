@@ -2,6 +2,14 @@ import yfinance as yf
 from src.domain.core_metrics import CoreMetrics
 from typing import List, Dict, Optional
 from dataclasses import dataclass
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class RateLimitError(Exception):
+    """Raised when Yahoo Finance rate limit is hit."""
+    pass
 
 
 @dataclass
@@ -17,30 +25,40 @@ class PriceHistory:
 
 class YFinanceProvider:
     def get_core_metrics(self, ticker_symbol: str) -> CoreMetrics:
-        t = yf.Ticker(ticker_symbol)
+        """
+        Fetch core metrics from Yahoo Finance.
+        Raises RateLimitError if rate limited.
+        """
+        try:
+            t = yf.Ticker(ticker_symbol)
+            info = t.info
+            qf = t.quarterly_financials
 
-        info = t.info
-        qf = t.quarterly_financials
+            net_income_series = []
+            if not qf.empty and "Net Income" in qf.index:
+                net_income_series = (
+                    qf.loc["Net Income"]
+                    .dropna()
+                    .head(4)
+                    .tolist()
+                )
 
-        net_income_series = []
-        if "Net Income" in qf.index:
-            net_income_series = (
-                qf.loc["Net Income"]
-                .dropna()
-                .head(4)
-                .tolist()
+            return CoreMetrics(
+                ticker=ticker_symbol,
+                price=info.get("currentPrice"),
+                market_cap=info.get("marketCap"),
+                pe_ttm=info.get("trailingPE"),
+                pe_forward=info.get("forwardPE"),
+                gross_margin=info.get("grossMargins"),
+                net_income_last_quarter=net_income_series[0] if net_income_series else None,
+                net_income_last_4_quarters=net_income_series,
             )
-
-        return CoreMetrics(
-            ticker=ticker_symbol,
-            price=info.get("currentPrice"),
-            market_cap=info.get("marketCap"),
-            pe_ttm=info.get("trailingPE"),
-            pe_forward=info.get("forwardPE"),
-            gross_margin=info.get("grossMargins"),
-            net_income_last_quarter=net_income_series[0] if net_income_series else None,
-            net_income_last_4_quarters=net_income_series,
-        )
+        except Exception as e:
+            error_msg = str(e).lower()
+            if "rate" in error_msg or "limit" in error_msg or "429" in error_msg:
+                logger.warning(f"Rate limit hit for {ticker_symbol}")
+                raise RateLimitError(f"Rate limit exceeded for {ticker_symbol}")
+            raise
 
     def get_price_history(self, ticker_symbol: str, days: int = 10) -> Optional[PriceHistory]:
         """

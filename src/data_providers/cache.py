@@ -140,8 +140,8 @@ class StockCache:
     
     # --- Price Cache (Tier 1) ---
     
-    def get_price(self, symbol: str) -> Optional[CachedPrice]:
-        """Get cached price if not stale."""
+    def get_price(self, symbol: str, allow_stale: bool = False) -> Optional[CachedPrice]:
+        """Get cached price. If allow_stale=True, returns even if expired."""
         conn = self._get_connection()
         try:
             row = conn.execute(
@@ -159,7 +159,7 @@ class StockCache:
                 fetched_at=datetime.fromisoformat(row["fetched_at"])
             )
             
-            if cached.is_stale:
+            if cached.is_stale and not allow_stale:
                 return None
             
             return cached
@@ -180,8 +180,8 @@ class StockCache:
     
     # --- Valuation Cache (Tier 2) ---
     
-    def get_valuation(self, symbol: str) -> Optional[CachedValuation]:
-        """Get cached valuation if not stale."""
+    def get_valuation(self, symbol: str, allow_stale: bool = False) -> Optional[CachedValuation]:
+        """Get cached valuation. If allow_stale=True, returns even if expired."""
         conn = self._get_connection()
         try:
             row = conn.execute(
@@ -200,7 +200,7 @@ class StockCache:
                 fetched_at=datetime.fromisoformat(row["fetched_at"])
             )
             
-            if cached.is_stale:
+            if cached.is_stale and not allow_stale:
                 return None
             
             return cached
@@ -222,8 +222,8 @@ class StockCache:
     
     # --- Earnings Cache (Tier 3) ---
     
-    def get_earnings(self, symbol: str) -> Optional[List[float]]:
-        """Get cached quarterly earnings (last 4 quarters)."""
+    def get_earnings(self, symbol: str, allow_stale: bool = False) -> Optional[List[float]]:
+        """Get cached quarterly earnings. If allow_stale=True, returns even if expired."""
         conn = self._get_connection()
         try:
             rows = conn.execute("""
@@ -238,7 +238,7 @@ class StockCache:
             # Check if data is stale (older than 90 days)
             fetched_at = datetime.fromisoformat(rows[0]["fetched_at"])
             age_days = (datetime.now() - fetched_at).days
-            if age_days > EARNINGS_TTL_DAYS:
+            if age_days > EARNINGS_TTL_DAYS and not allow_stale:
                 return None
             
             return [row["net_income"] for row in rows if row["net_income"] is not None]
@@ -278,5 +278,20 @@ class StockCache:
             ).fetchone()[0]
             stats["db_size_kb"] = self.db_path.stat().st_size / 1024 if self.db_path.exists() else 0
             return stats
+        finally:
+            conn.close()
+    
+    def get_latest_update_time(self) -> Optional[datetime]:
+        """Get the most recent data update timestamp across all cached data."""
+        conn = self._get_connection()
+        try:
+            # Check prices table for most recent update
+            row = conn.execute(
+                "SELECT MAX(fetched_at) as latest FROM prices"
+            ).fetchone()
+            
+            if row and row["latest"]:
+                return datetime.fromisoformat(row["latest"])
+            return None
         finally:
             conn.close()
