@@ -95,6 +95,31 @@ provider = CachedDataProvider()
 if "positions" not in st.session_state:
     st.session_state.positions = {}
 
+# --- Favorites Management (Client-side persistence via URL query params) ---
+DEFAULT_FAVORITES = ["NVDA", "AAPL"]  # Default if no favorites saved
+
+def get_saved_favorites():
+    """Get favorites from URL query params."""
+    params = st.query_params
+    if "favorites" in params:
+        # Parse comma-separated tickers
+        favorites_str = params["favorites"]
+        return [f.strip() for f in favorites_str.split(",") if f.strip()][:10]
+    return None
+
+def save_favorites(tickers):
+    """Save favorites to URL query params."""
+    if tickers:
+        st.query_params["favorites"] = ",".join(tickers[:10])
+    elif "favorites" in st.query_params:
+        del st.query_params["favorites"]
+
+# Initialize favorites from URL or defaults
+saved_favorites = get_saved_favorites()
+if "favorites_initialized" not in st.session_state:
+    st.session_state.favorites_initialized = True
+    st.session_state.current_favorites = saved_favorites or DEFAULT_FAVORITES
+
 # --- Header ---
 st.title("Stock Tracker")
 
@@ -137,23 +162,42 @@ available_tickers = [
 
 ticker_options = [f"{t[0]} - {t[1]}" for t in available_tickers]
 ticker_map = {f"{t[0]} - {t[1]}": t[0] for t in available_tickers}
+reverse_ticker_map = {t[0]: f"{t[0]} - {t[1]}" for t in available_tickers}
 
-col_select, col_info = st.columns([3, 1])
+# Convert saved favorites to display format
+def get_default_selection():
+    """Get default selection from favorites."""
+    defaults = []
+    for ticker in st.session_state.current_favorites:
+        if ticker in reverse_ticker_map:
+            defaults.append(reverse_ticker_map[ticker])
+    return defaults if defaults else ["NVDA - NVIDIA Corp", "AAPL - Apple Inc"]
+
+col_select, col_fav = st.columns([3, 1])
 with col_select:
     selected_display = st.multiselect(
         "Select tickers to compare (max 10):",
         options=ticker_options,
-        default=["NVDA - NVIDIA Corp", "AAPL - Apple Inc"],
+        default=get_default_selection(),
         max_selections=10,
-        help="Select 2+ tickers for comparison view"
+        help="Select 2+ tickers for comparison view. Use ⭐ to save as favorites."
     )
 
 selected_tickers = [ticker_map[s] for s in selected_display]
 
-with col_info:
+with col_fav:
     st.markdown(f"**{len(selected_tickers)}** of 10 selected")
-    if len(selected_tickers) >= 10:
-        st.warning("Maximum reached")
+    
+    # Save as favorites button
+    if st.button("⭐ Save as Favorites", help="Save current selection as your default favorites"):
+        st.session_state.current_favorites = selected_tickers
+        save_favorites(selected_tickers)
+        st.success("Favorites saved!")
+        st.rerun()
+    
+    # Show current favorites status
+    if saved_favorites:
+        st.caption(f"📌 {len(saved_favorites)} favorites loaded")
 
 if not selected_tickers:
     st.info("Select at least one ticker to begin.")
@@ -206,7 +250,6 @@ with tab_fundamental:
     # Style the dataframe
     st.dataframe(
         fundamental_df,
-        use_container_width=True,
         height=320,
     )
 
@@ -235,25 +278,23 @@ with tab_earnings:
     
     earnings_df = pd.DataFrame(earnings_rows).set_index("Ticker")
     
-    st.dataframe(
-        earnings_df,
-        use_container_width=True,
-    )
+    st.dataframe(earnings_df)
     
     # Trend visualization (subordinate to matrix per PRD)
     st.markdown("### Earnings Trend Visualization")
     st.markdown('<p class="info-dense">Derived from the Earnings History matrix above.</p>', unsafe_allow_html=True)
     
-    # Build numeric data for chart
+    # Build numeric data for chart - ensure all arrays have exactly 4 elements
     trend_data = {}
     for ticker in selected_tickers:
         m = metrics_data[ticker]
         quarters = m.net_income_last_4_quarters or []
-        # Reverse for chronological order (oldest to newest)
-        trend_data[ticker] = [q/1e9 if q else None for q in reversed(quarters)]
+        # Pad to 4 quarters if less, reverse for chronological order
+        padded = [None] * (4 - len(quarters)) + list(reversed(quarters))
+        trend_data[ticker] = [q/1e9 if q else None for q in padded]
     
     trend_df = pd.DataFrame(trend_data, index=["Q-4", "Q-3", "Q-2", "Q-1 (Latest)"])
-    st.line_chart(trend_df, use_container_width=True)
+    st.line_chart(trend_df)
 
 # =============================================================================
 # TAB 3: PRICE CHANGE HISTORY (User Story 3.4)
@@ -285,7 +326,7 @@ with tab_price_history:
             })
         
         summary_df = pd.DataFrame(summary_rows).set_index("Ticker")
-        st.dataframe(summary_df, use_container_width=True)
+        st.dataframe(summary_df)
         
         # Detailed daily changes matrix
         st.markdown("### Daily Changes Matrix")
@@ -307,7 +348,7 @@ with tab_price_history:
             daily_rows.append(row)
         
         daily_df = pd.DataFrame(daily_rows).set_index("Ticker")
-        st.dataframe(daily_df, use_container_width=True)
+        st.dataframe(daily_df)
         
         # Trend chart
         st.markdown("### Price Change Trend")
@@ -319,7 +360,7 @@ with tab_price_history:
         # Use dates from first ticker, reversed
         chart_dates = list(reversed(date_labels))
         chart_df = pd.DataFrame(chart_data, index=chart_dates)
-        st.line_chart(chart_df, use_container_width=True)
+        st.line_chart(chart_df)
         
     else:
         st.warning("Unable to fetch price history data.")
@@ -427,7 +468,7 @@ with tab_positions:
                 })
         
         if pos_rows:
-            st.dataframe(pd.DataFrame(pos_rows).set_index("Ticker"), use_container_width=True)
+            st.dataframe(pd.DataFrame(pos_rows).set_index("Ticker"))
 
 # --- Sidebar with cache stats ---
 with st.sidebar:
