@@ -9,14 +9,13 @@ Following PRD Chapter 7 UI Requirements:
 
 import streamlit as st
 import pandas as pd
-#import sys
-#from pathlib import Path
+import sys
+from pathlib import Path
 
-
-# Add project root to path for imports
-#project_root = Path(__file__).parent.parent.parent
-#if str(project_root) not in sys.path:
-#    sys.path.insert(0, str(project_root))
+# Add project root to path for imports (required for Streamlit Cloud)
+project_root = Path(__file__).parent.parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 
 from src.data_providers.cached_provider import CachedDataProvider
 from src.domain.earnings_momentum import classify_earnings_momentum
