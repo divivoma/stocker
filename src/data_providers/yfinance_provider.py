@@ -1,5 +1,6 @@
 import yfinance as yf
 from src.domain.core_metrics import CoreMetrics
+from src.domain.currency import normalize_earnings_to_usd, convert_to_usd
 from typing import List, Dict, Optional
 from dataclasses import dataclass
 import logging
@@ -27,12 +28,17 @@ class YFinanceProvider:
     def get_core_metrics(self, ticker_symbol: str) -> CoreMetrics:
         """
         Fetch core metrics from Yahoo Finance.
+        Earnings are normalized to USD for cross-currency comparison.
         Raises RateLimitError if rate limited.
         """
         try:
             t = yf.Ticker(ticker_symbol)
             info = t.info
             qf = t.quarterly_financials
+
+            # Get currency information
+            price_currency = info.get("currency", "USD")
+            financial_currency = info.get("financialCurrency", "USD")
 
             net_income_series = []
             if not qf.empty and "Net Income" in qf.index:
@@ -43,6 +49,9 @@ class YFinanceProvider:
                     .tolist()
                 )
 
+            # Normalize earnings to USD for comparison
+            net_income_usd = normalize_earnings_to_usd(net_income_series, financial_currency)
+
             return CoreMetrics(
                 ticker=ticker_symbol,
                 price=info.get("currentPrice"),
@@ -52,6 +61,10 @@ class YFinanceProvider:
                 gross_margin=info.get("grossMargins"),
                 net_income_last_quarter=net_income_series[0] if net_income_series else None,
                 net_income_last_4_quarters=net_income_series,
+                price_currency=price_currency,
+                financial_currency=financial_currency,
+                net_income_last_quarter_usd=net_income_usd[0] if net_income_usd else None,
+                net_income_last_4_quarters_usd=net_income_usd,
             )
         except Exception as e:
             error_msg = str(e).lower()

@@ -227,7 +227,7 @@ tab_fundamental, tab_earnings, tab_price_history, tab_positions = st.tabs([
 # =============================================================================
 with tab_fundamental:
     st.markdown("## Matrix A: Fundamental Snapshot")
-    st.markdown('<p class="info-dense">Compare valuation and profitability across tickers at a glance.</p>', unsafe_allow_html=True)
+    st.markdown('<p class="info-dense">Compare valuation and profitability across tickers. Earnings normalized to USD for comparison.</p>', unsafe_allow_html=True)
     
     # Build matrix: Columns = Tickers, Rows = Metrics
     fundamental_data = {}
@@ -235,13 +235,18 @@ with tab_fundamental:
         m = metrics_data[ticker]
         momentum = classify_earnings_momentum(m.net_income_last_4_quarters)
         
+        # Use USD-normalized earnings if available, otherwise original
+        net_income_display = m.net_income_last_quarter_usd if m.net_income_last_quarter_usd else m.net_income_last_quarter
+        currency_note = f" ({m.financial_currency})" if m.financial_currency != "USD" else ""
+        
         fundamental_data[ticker] = {
-            "Price ($)": f"${m.price:,.2f}" if m.price else "--",
-            "Market Cap ($B)": f"${m.market_cap/1e9:,.1f}B" if m.market_cap else "--",
+            "Price": f"${m.price:,.2f}" if m.price else "--",
+            "Market Cap": f"${m.market_cap/1e9:,.1f}B" if m.market_cap else "--",
             "P/E (TTM)": f"{m.pe_ttm:.1f}" if m.pe_ttm else "--",
             "P/E (Forward)": f"{m.pe_forward:.1f}" if m.pe_forward else "--",
             "Gross Margin": f"{m.gross_margin:.1%}" if m.gross_margin else "--",
-            "Net Income (Last Q)": f"${m.net_income_last_quarter/1e9:.2f}B" if m.net_income_last_quarter else "--",
+            "Net Income (USD)": f"${net_income_display/1e9:.2f}B" if net_income_display else "--",
+            "Orig. Currency": m.financial_currency if m.financial_currency != "USD" else "USD",
             "Earnings Momentum": momentum,
         }
     
@@ -250,15 +255,15 @@ with tab_fundamental:
     # Style the dataframe
     st.dataframe(
         fundamental_df,
-        height=320,
+        height=350,
     )
 
 # =============================================================================
 # TAB 2: EARNINGS HISTORY (Matrix B per PRD)
 # =============================================================================
 with tab_earnings:
-    st.markdown("## Matrix B: Earnings History")
-    st.markdown('<p class="info-dense">Last 4 quarters of net income. Rows = Tickers, Columns = Quarters.</p>', unsafe_allow_html=True)
+    st.markdown("## Matrix B: Earnings History (USD Normalized)")
+    st.markdown('<p class="info-dense">Last 4 quarters of net income, normalized to USD for cross-currency comparison.</p>', unsafe_allow_html=True)
     
     quarter_labels = ["Q-1 (Latest)", "Q-2", "Q-3", "Q-4"]
     earnings_rows = []
@@ -267,12 +272,19 @@ with tab_earnings:
         m = metrics_data[ticker]
         row = {"Ticker": ticker}
         
-        quarters = m.net_income_last_4_quarters or []
+        # Use USD-normalized quarters if available
+        quarters_usd = m.net_income_last_4_quarters_usd or []
+        quarters_orig = m.net_income_last_4_quarters or []
+        quarters = quarters_usd if quarters_usd else quarters_orig
+        
         for i, q in enumerate(quarter_labels):
             if i < len(quarters) and quarters[i] is not None:
                 row[q] = f"${quarters[i]/1e9:.2f}B"
             else:
                 row[q] = "--"
+        
+        # Add original currency column
+        row["Currency"] = m.financial_currency if m.financial_currency else "USD"
         
         earnings_rows.append(row)
     
@@ -281,14 +293,15 @@ with tab_earnings:
     st.dataframe(earnings_df)
     
     # Trend visualization (subordinate to matrix per PRD)
-    st.markdown("### Earnings Trend Visualization")
-    st.markdown('<p class="info-dense">Derived from the Earnings History matrix above.</p>', unsafe_allow_html=True)
+    st.markdown("### Earnings Trend Visualization (USD)")
+    st.markdown('<p class="info-dense">Derived from the Earnings History matrix above. All values in USD billions.</p>', unsafe_allow_html=True)
     
-    # Build numeric data for chart - ensure all arrays have exactly 4 elements
+    # Build numeric data for chart - ensure all arrays have exactly 4 elements, use USD values
     trend_data = {}
     for ticker in selected_tickers:
         m = metrics_data[ticker]
-        quarters = m.net_income_last_4_quarters or []
+        # Prefer USD-normalized values
+        quarters = m.net_income_last_4_quarters_usd or m.net_income_last_4_quarters or []
         # Pad to 4 quarters if less, reverse for chronological order
         padded = [None] * (4 - len(quarters)) + list(reversed(quarters))
         trend_data[ticker] = [q/1e9 if q else None for q in padded]
