@@ -64,6 +64,11 @@ class CachedDataProvider:
                 gross_margin=cached_valuation.gross_margin,
                 net_income_last_quarter=cached_earnings[0] if cached_earnings else None,
                 net_income_last_4_quarters=cached_earnings or [],
+                # Currency fields - defaults for cached data (USD assumed)
+                price_currency="USD",
+                financial_currency="USD",
+                net_income_last_quarter_usd=cached_earnings[0] if cached_earnings else None,
+                net_income_last_4_quarters_usd=cached_earnings or [],
             )
         
         # Cache miss - try to fetch from yfinance
@@ -111,6 +116,8 @@ class CachedDataProvider:
         cached_valuation = self.cache.get_valuation(ticker_symbol, allow_stale=True)
         cached_earnings = self.cache.get_earnings(ticker_symbol, allow_stale=True)
         
+        earnings_list = cached_earnings or []
+        
         if cached_price or cached_valuation or cached_earnings:
             return CoreMetrics(
                 ticker=ticker_symbol,
@@ -119,8 +126,13 @@ class CachedDataProvider:
                 pe_ttm=cached_valuation.pe_ttm if cached_valuation else None,
                 pe_forward=cached_valuation.pe_forward if cached_valuation else None,
                 gross_margin=cached_valuation.gross_margin if cached_valuation else None,
-                net_income_last_quarter=cached_earnings[0] if cached_earnings else None,
-                net_income_last_4_quarters=cached_earnings or [],
+                net_income_last_quarter=earnings_list[0] if earnings_list else None,
+                net_income_last_4_quarters=earnings_list,
+                # Currency fields - defaults for cached data
+                price_currency="USD",
+                financial_currency="USD",
+                net_income_last_quarter_usd=earnings_list[0] if earnings_list else None,
+                net_income_last_4_quarters_usd=earnings_list,
             )
         
         # No cached data at all - return empty metrics
@@ -133,6 +145,10 @@ class CachedDataProvider:
             gross_margin=None,
             net_income_last_quarter=None,
             net_income_last_4_quarters=[],
+            price_currency="USD",
+            financial_currency="USD",
+            net_income_last_quarter_usd=None,
+            net_income_last_4_quarters_usd=[],
         )
     
     def get_cache_stats(self) -> dict:
